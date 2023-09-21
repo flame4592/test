@@ -1,0 +1,40 @@
+import boto3
+import botocore
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
+
+def lambda_handler(event, context):
+    s3 = boto3.client('s3')
+    ses = boto3.client('ses')
+
+    # Get S3 bucket and object information from the event
+    bucket = event['Records'][0]['s3']['bucket']['name']
+    key = event['Records'][0]['s3']['object']['key']
+
+    # Retrieve the file from S3
+    try:
+        response = s3.get_object(Bucket=bucket, Key=key)
+        file_contents = response['Body'].read().decode('utf-8')
+
+        # Compose the email
+        subject = "File Contents from S3"
+        body = file_contents
+        sender = "your-email@example.com"
+        recipient = "recipient@example.com"
+
+        msg = MIMEMultipart()
+        msg['Subject'] = subject
+        msg['From'] = sender
+        msg['To'] = recipient
+        msg.attach(MIMEText(body, 'plain'))
+
+        # Send the email
+        ses.send_raw_email(
+            Source=sender,
+            Destinations=[recipient],
+            RawMessage={'Data': msg.as_string()}
+        )
+
+        return "Email sent successfully."
+    except botocore.exceptions.ClientError as e:
+        return f"Error: {e}"
